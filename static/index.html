@@ -61,6 +61,17 @@ const routes=page.routes||{};
 return sum+Object.values(routes).reduce((n,items)=>n+(Array.isArray(items)?items.length:0),0);
 },0);
 
+const totalVectorPaths=pages.reduce((sum,page)=>{
+return sum+(Array.isArray(page.vector_paths)?page.vector_paths.length:0);
+},0);
+
+const vectorPathDetails=pages.map(page=>{
+const paths=Array.isArray(page.vector_paths)?page.vector_paths:[];
+const red=paths.filter(path=>path.type==="special_stage").length;
+const blue=paths.filter(path=>path.type==="road_section").length;
+return "Page "+page.page+": "+red+" red paths, "+blue+" blue paths";
+}).join(" | ");
+
 status.textContent="Analysis complete.";
 const summary=document.createElement("section");
 summary.className="panel";
@@ -68,7 +79,7 @@ const heading=document.createElement("h2");
 heading.textContent="Detected route information";
 summary.appendChild(heading);
 const details=document.createElement("p");
-details.textContent=result.filename+" — "+pages.length+" page(s), "+totalStages+" stage label group(s), "+totalComponents+" detected route components.";
+details.textContent=result.filename+" — "+pages.length+" page(s), "+totalStages+" stage label group(s), "+totalComponents+" detected route components. Vector paths: "+totalVectorPaths+". "+vectorPathDetails;
 summary.appendChild(details);
 results.appendChild(summary);
 
