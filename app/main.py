@@ -19,7 +19,73 @@ app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS)), name="uploads")
 STAGE_RE = re.compile(r"(SS\d+)\s*&\s*(SS\d+)\s*[—-]\s*([^—\n]+)", re.I)
 
+
 def render_pdf(data: bytes):
+    doc = fitz.open(stream=data, filetype="pdf")
+    pages = []
+
+    for i, page in enumerate(doc):
+        # Render the original page image for display.
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False)
+        img = Image.open(io.BytesIO(pix.tobytes("png"))).convert("RGB")
+        out = UPLOADS / f"page_{i+1}.png"
+        img.save(out)
+
+        # Extract vector drawing paths directly from the PDF.
+        vector_paths = []
+        for drawing in page.get_drawings():
+            color = drawing.get("color")
+            fill = drawing.get("fill")
+            items = drawing.get("items", [])
+
+            # Keep paths with a clear red or blue stroke.
+            route_type = None
+            if color:
+                r, g, b = color
+                if r > 0.65 and g < 0.4 and b < 0.4:
+                    route_type = "special_stage"
+                elif b > 0.5 and r < 0.4 and g < 0.5:
+                    route_type = "road_section"
+
+            if route_type is None:
+                continue
+
+            segments = []
+            for item in items:
+                kind = item[0]
+
+                if kind == "l":
+                    p1, p2 = item[1], item[2]
+                    segments.append([
+                        [float(p1.x), float(p1.y)],
+                        [float(p2.x), float(p2.y)]
+                    ])
+                elif kind == "c":
+                    p1, p2, p3, p4 = item[1], item[2], item[3], item[4]
+                    segments.append([
+                        [float(p1.x), float(p1.y)],
+                        [float(p2.x), float(p2.y)],
+                        [float(p3.x), float(p3.y)],
+                        [float(p4.x), float(p4.y)]
+                    ])
+
+            if segments:
+                vector_paths.append({
+                    "type": route_type,
+                    "segments": segments,
+                    "width": float(drawing.get("width") or 0)
+                })
+
+        text = page.get_text("text")
+        pages.append({
+            "page": i + 1,
+            "image": f"/uploads/{out.name}",
+            "text": text,
+            "vector_paths": vector_paths
+        })
+
+    return pages
+
     doc = fitz.open(stream=data, filetype="pdf")
     pages = []
     for i, page in enumerate(doc):
