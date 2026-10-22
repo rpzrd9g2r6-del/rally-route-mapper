@@ -2,201 +2,134 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RallyStagePlan — Route Mapper</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 24px;
-      color: #202124;
-      background: #f5f6f8;
-    }
-    h1 { margin-bottom: 6px; }
-    .panel {
-      background: white;
-      padding: 20px;
-      margin: 20px 0;
-      border-radius: 10px;
-      box-shadow: 0 2px 8px #00000012;
-    }
-    button {
-      padding: 12px 18px;
-      background: #1769e0;
-      color: white;
-      border: 0;
-      border-radius: 6px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:disabled { opacity: 0.6; cursor: wait; }
-    input { margin: 12px 0; }
-    .status { white-space: pre-wrap; }
-    .stage {
-      display: inline-block;
-      background: #e8f0fe;
-      padding: 8px 12px;
-      margin: 5px;
-      border-radius: 6px;
-    }
-    .map-image {
-      display: block;
-      width: 100%;
-      height: auto;
-      margin-top: 12px;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-    }
-    .error { color: #b00020; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RallyStagePlan — Route Mapper</title>
+<style>
+body{font-family:Arial,sans-serif;max-width:1100px;margin:0 auto;padding:24px;color:#202124;background:#f5f6f8}
+.panel{background:white;padding:20px;margin:20px 0;border-radius:10px;box-shadow:0 2px 8px #00000012}
+button{padding:12px 18px;background:#1769e0;color:white;border:0;border-radius:6px;cursor:pointer;font-size:16px}
+button:disabled{opacity:.6;cursor:wait}
+input{margin:12px 0}
+.status{white-space:pre-wrap}
+.stage{display:inline-block;background:#e8f0fe;padding:8px 12px;margin:5px;border-radius:6px}
+.map-image{display:block;width:100%;height:auto;margin-top:12px;border:1px solid #ddd;border-radius:6px}
+.error{color:#b00020}
+.muted{color:#5f6368}
+</style>
 </head>
 <body>
-  <h1>RallyStagePlan</h1>
-  <p>Upload a rally route PDF to identify stages and view its map pages.</p>
+<h1>RallyStagePlan</h1>
+<p>Upload a rally route PDF to identify stages and view the original map pages.</p>
+<div class="panel">
+<form id="uploadForm">
+<label for="pdfFile"><strong>Select rally map PDF or image</strong></label><br>
+<input id="pdfFile" name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/*" required>
+<br><button id="analyseButton" type="submit">Analyse map</button>
+</form>
+<p id="status" class="status"></p>
+</div>
+<div id="results"></div>
+<script>
+const form=document.getElementById("uploadForm");
+const fileInput=document.getElementById("pdfFile");
+const button=document.getElementById("analyseButton");
+const status=document.getElementById("status");
+const results=document.getElementById("results");
 
-  <div class="panel">
-    <form id="uploadForm">
-      <label for="pdfFile"><strong>Select rally map PDF</strong></label><br>
-      <input id="pdfFile" name="file" type="file" accept=".pdf,application/pdf" required>
-      <br>
-      <button id="analyseButton" type="submit">Analyse map</button>
-    </form>
-    <p id="status" class="status"></p>
-  </div>
+form.addEventListener("submit",async event=>{
+event.preventDefault();
+if(!fileInput.files.length){status.textContent="Please select a PDF or image first.";return;}
+button.disabled=true;
+status.className="status";
+status.textContent="Uploading and analysing map…";
+results.replaceChildren();
 
-  <div id="results"></div>
+try{
+const data=new FormData();
+data.append("file",fileInput.files[0]);
+const response=await fetch("/api/upload",{method:"POST",body:data});
+if(!response.ok){
+const detail=await response.text();
+throw new Error("Server returned "+response.status+(detail?": "+detail.slice(0,200):""));
+}
+const result=await response.json();
+const pages=Array.isArray(result.pages)?result.pages:[];
+const totalStages=pages.reduce((sum,page)=>sum+(Array.isArray(page.stages)?page.stages.length:0),0);
+const totalComponents=pages.reduce((sum,page)=>{
+const routes=page.routes||{};
+return sum+Object.values(routes).reduce((n,items)=>n+(Array.isArray(items)?items.length:0),0);
+},0);
 
-  <script>
-    const form = document.getElementById("uploadForm");
-    const fileInput = document.getElementById("pdfFile");
-    const button = document.getElementById("analyseButton");
-    const status = document.getElementById("status");
-    const results = document.getElementById("results");
+status.textContent="Analysis complete.";
+const summary=document.createElement("section");
+summary.className="panel";
+const heading=document.createElement("h2");
+heading.textContent="Detected route information";
+summary.appendChild(heading);
+const details=document.createElement("p");
+details.textContent=result.filename+" — "+pages.length+" page(s), "+totalStages+" stage label group(s), "+totalComponents+" detected route components.";
+summary.appendChild(details);
+results.appendChild(summary);
 
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
+if(!pages.length){
+const note=document.createElement("p");
+note.textContent="The server did not return any page data.";
+results.appendChild(note);
+}
 
-      if (!fileInput.files.length) {
-        status.textContent = "Please select a PDF first.";
-        return;
-      }
+pages.forEach((page,index)=>{
+const section=document.createElement("section");
+section.className="panel";
+const title=document.createElement("h2");
+title.textContent="Page "+(page.page||index+1);
+section.appendChild(title);
 
-      button.disabled = true;
-      status.className = "status";
-      status.textContent = "Uploading and analysing PDF…";
-      results.replaceChildren();
+const stages=Array.isArray(page.stages)?page.stages:[];
+if(stages.length){
+const stageTitle=document.createElement("h3");
+stageTitle.textContent="Stage labels";
+section.appendChild(stageTitle);
+stages.forEach(stage=>{
+const badge=document.createElement("div");
+badge.className="stage";
+badge.textContent=(stage.stages||[]).join(" & ")+" — "+(stage.name||"Venue not extracted");
+section.appendChild(badge);
+});
+}else{
+const none=document.createElement("p");
+none.className="muted";
+none.textContent="No stage labels detected on this page.";
+section.appendChild(none);
+}
 
-      try {
-        const data = new FormData();
-        data.append("file", fileInput.files[0]);
-
-        const response = await fetch("/upload", {
-          method: "POST",
-          body: data
-        });
-
-        if (!response.ok) {
-          throw new Error("The server returned error " + response.status);
-        }
-
-        const result = await response.json();
-
-        status.textContent =
-          result.message ||
-          `${result.pages ?? "?"} page(s) processed.`;
-
-        const summary = document.createElement("div");
-        summary.className = "panel";
-        const heading = document.createElement("h2");
-        heading.textContent = "Detected route information";
-        summary.appendChild(heading);
-
-        const description = document.createElement("p");
-        description.textContent =
-          result.message ||
-          `${result.pages ?? "?"} page(s), ${result.stages?.length ?? 0} stage label group(s) detected.`;
-        summary.appendChild(description);
-
-        if (Array.isArray(result.stages)) {
-          result.stages.forEach(stage => {
-            const badge = document.createElement("div");
-            badge.className = "stage";
-            badge.textContent =
-              `${(stage.stages || []).join(" & ")} — ${stage.name || "Venue not extracted"}`;
-            summary.appendChild(badge);
-          });
-        }
-        results.appendChild(summary);
-
-        const pages = result.page_images || result.images || result.pages_data || [];
-
-        if (Array.isArray(pages) && pages.length) {
-          pages.forEach((page, index) => {
-            const section = document.createElement("div");
-            section.className = "panel";
-
-            const title = document.createElement("h2");
-            title.textContent = `Page ${page.page || index + 1}`;
-            section.appendChild(title);
-
-            const image = document.createElement("img");
-            const imagePath =
-              typeof page === "string" ? page :
-              page.url || page.image_url || page.image || page.path || "";
-
-            if (imagePath) {
-              image.src = imagePath.startsWith("http")
-                ? imagePath
-                : new URL(imagePath, window.location.origin).href;
-              image.alt = `Rally map page ${index + 1}`;
-              image.className = "map-image";
-              image.onerror = () => {
-                image.replaceWith(
-                  document.createTextNode(
-                    "The map image could not be loaded: " + imagePath
-                  )
-                );
-              };
-              section.appendChild(image);
-            } else {
-              section.appendChild(
-                document.createTextNode("No image URL was provided by the server.")
-              );
-            }
-            results.appendChild(section);
-          });
-        } else if (Array.isArray(result.image_urls) && result.image_urls.length) {
-          result.image_urls.forEach((url, index) => {
-            const section = document.createElement("div");
-            section.className = "panel";
-            const title = document.createElement("h2");
-            title.textContent = `Page ${index + 1}`;
-            section.appendChild(title);
-            const image = document.createElement("img");
-            image.src = url;
-            image.alt = `Rally map page ${index + 1}`;
-            image.className = "map-image";
-            section.appendChild(image);
-            results.appendChild(section);
-          });
-        } else {
-          const note = document.createElement("div");
-          note.className = "panel";
-          note.textContent =
-            "The PDF was analysed, but the server response did not include image URLs. We need to connect the page images returned by the backend next.";
-          results.appendChild(note);
-        }
-      } catch (error) {
-        status.className = "status error";
-        status.textContent =
-          "Analysis failed: " + error.message +
-          ". Please try again.";
-      } finally {
-        button.disabled = false;
-      }
-    });
-  </script>
+if(page.image){
+const image=document.createElement("img");
+image.className="map-image";
+image.src=page.image;
+image.alt="Original rally route map, page "+(page.page||index+1);
+image.onerror=()=>{
+const message=document.createElement("p");
+message.className="error";
+message.textContent="The map image could not load ("+page.image+").";
+image.replaceWith(message);
+};
+section.appendChild(image);
+}else{
+const missing=document.createElement("p");
+missing.className="error";
+missing.textContent="No map image address was returned for this page.";
+section.appendChild(missing);
+}
+results.appendChild(section);
+});
+}catch(error){
+status.className="status error";
+status.textContent="Analysis failed: "+error.message+".";
+}finally{
+button.disabled=false;
+}
+});
+</script>
 </body>
 </html>
