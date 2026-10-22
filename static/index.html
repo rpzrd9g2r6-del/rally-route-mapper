@@ -121,6 +121,25 @@ missing.className="error";
 missing.textContent="No map image address was returned for this page.";
 section.appendChild(missing);
 }
+  if(page.overlay){
+  const overlayTitle = document.createElement("h3");
+  overlayTitle.textContent = "Route Overlay";
+  section.appendChild(overlayTitle);
+
+  const overlayImage = document.createElement("img");
+  overlayImage.className = "map-image";
+  overlayImage.src = page.overlay;
+  overlayImage.alt = "Route overlay, page " + (page.page || index + 1);
+
+  overlayImage.onerror = () => {
+    const message = document.createElement("p");
+    message.className = "error";
+    message.textContent = "The route overlay could not load.";
+    overlayImage.replaceWith(message);
+  };
+
+  section.appendChild(overlayImage);
+}
 results.appendChild(section);
 });
 }catch(error){
