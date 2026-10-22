@@ -151,6 +151,27 @@ section.appendChild(missing);
 
   section.appendChild(overlayImage);
 }
+
+if(page.vector_preview){
+  const previewTitle = document.createElement("h3");
+  previewTitle.textContent = "Extracted Vector Paths";
+  section.appendChild(previewTitle);
+
+  const previewImage = document.createElement("img");
+  previewImage.className = "map-image";
+  previewImage.src = page.vector_preview;
+  previewImage.alt = "Extracted vector paths, page " + (page.page || index + 1);
+
+  previewImage.onerror = () => {
+    const message = document.createElement("p");
+    message.className = "error";
+    message.textContent = "The vector preview could not load.";
+    previewImage.replaceWith(message);
+  };
+
+  section.appendChild(previewImage);
+}
+
 results.appendChild(section);
 });
 }catch(error){
