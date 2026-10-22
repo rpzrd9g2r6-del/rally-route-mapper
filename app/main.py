@@ -76,6 +76,34 @@ def render_pdf(data: bytes):
                     "width": float(drawing.get("width") or 0)
                 })
 
+        # Create a preview showing the extracted vector paths.
+        preview = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+        preview = preview.copy()
+        scale = 2
+
+        for path in vector_paths:
+            color = (0, 0, 255) if path["type"] == "special_stage" else (255, 0, 0)
+
+            for segment in path["segments"]:
+                points = np.array(
+                    [[round(x * scale), round(y * scale)] for x, y in segment],
+                    dtype=np.int32
+                )
+
+                if len(points) >= 2:
+                    cv2.polylines(
+                        preview,
+                        [points],
+                        isClosed=False,
+                        color=color,
+                        thickness=3,
+                        lineType=cv2.LINE_AA
+                    )
+
+        preview_name = f"vector_preview_page_{i+1}.png"
+        preview_path = UPLOADS / preview_name
+        cv2.imwrite(str(preview_path), preview)
+
         text = page.get_text("text")
         pages.append({
             "page": i + 1,
