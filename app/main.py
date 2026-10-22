@@ -59,11 +59,58 @@ def detect_colours(img: np.ndarray):
 
 def extract_stages(text: str):
     stages = []
-    for m in STAGE_RE.finditer(text):
-        stages.append({"stages": [m.group(1).upper(), m.group(2).upper()],
-                       "name": m.group(3).strip()})
-    return stages
+    lines = [
+        re.sub(r"\s+", " ", line).strip(" \t:—-")
+        for line in text.splitlines()
+    ]
 
+    pair_re = re.compile(
+        r"\b(SS\s*\d+)\s*&\s*(SS\s*\d+)\b",
+        re.IGNORECASE
+    )
+    skip_re = re.compile(
+        r"Friday|Saturday|Sunday|Monday|Tuesday|Wednesday|Thursday|"
+        r"\b\d{1,2}:\d{2}\b|\b\d{4}\b|hrs?|Start|Finish|Regroup|"
+        r"Passage Control|Overall Route Map|Shakedown|"
+        r"Rev|Crown Copyright|Road Section|Special Stage",
+        re.IGNORECASE
+    )
+
+    seen = set()
+
+    for i, line in enumerate(lines):
+        match = pair_re.search(line)
+        if not match:
+            continue
+
+        pair = [
+            re.sub(r"\s+", "", match.group(1)).upper(),
+            re.sub(r"\s+", "", match.group(2)).upper()
+        ]
+
+        if tuple(pair) in seen:
+            continue
+        seen.add(tuple(pair))
+
+        venue = ""
+        candidates = [line[match.end():]] + lines[i + 1:i + 6]
+
+        for candidate in candidates:
+            candidate = candidate.strip(" \t:—-")
+            if not candidate or pair_re.search(candidate):
+                continue
+            if skip_re.search(candidate):
+                continue
+            if re.search(r"[A-Za-z]", candidate) and len(candidate) <= 65:
+                venue = candidate
+                break
+
+        stages.append({
+            "stages": pair,
+            "name": venue or "Venue not extracted"
+        })
+
+    return stages
 @app.get("/", response_class=HTMLResponse)
 def index():
     return (BASE / "static" / "index.html").read_text(encoding="utf-8")
