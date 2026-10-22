@@ -165,20 +165,24 @@ async def upload(file: UploadFile = File(...)):
         pages = [{"page":1, "image":f"/uploads/{name}", "text":""}]
 
 
-for p in pages:
-    image_path = UPLOADS / Path(p["image"]).name
-    img = cv2.imread(str(image_path))
-    return JSONResponse({"filename": file.filename, "pages": pages})
-    p["routes"] = detect_colours(img) if img is not None else {}
-    p["stages"] = extract_stages(p["text"])
 
-    if img is not None:
-        overlay_name = f"overlay_page_{p['page']}.png"
-        overlay_path = UPLOADS / overlay_name
-        create_route_overlay(img, overlay_path)
-        p["overlay"] = f"/uploads/{overlay_name}"
-    else:
-        p["overlay"] = None
+    for p in pages:
+        image_path = UPLOADS / Path(p["image"]).name
+        img = cv2.imread(str(image_path))
+
+        p["routes"] = detect_colours(img) if img is not None else {}
+        p["stages"] = extract_stages(p["text"])
+
+        if img is not None:
+            overlay_name = f"overlay_page_{p['page']}.png"
+            overlay_path = UPLOADS / overlay_name
+            create_route_overlay(img, overlay_path)
+            p["overlay"] = f"/uploads/{overlay_name}"
+        else:
+            p["overlay"] = None
+
+    return JSONResponse({"filename": file.filename, "pages": pages})
+
 @app.post("/api/geojson")
 async def geojson(payload: Dict[str, Any]):
     # Pixel -> lat/lon affine calibration. Three or more control points are required.
