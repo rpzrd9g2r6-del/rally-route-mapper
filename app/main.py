@@ -16,7 +16,7 @@ UPLOADS.mkdir(exist_ok=True)
 
 app = FastAPI(title="Rally Route Mapper")
 app.mount("/static", StaticFiles(directory=str(BASE / "static")), name="static")
-
+app.mount("/uploads", StaticFiles(directory=str(UPLOADS)), name="uploads")
 STAGE_RE = re.compile(r"(SS\d+)\s*&\s*(SS\d+)\s*[—-]\s*([^—\n]+)", re.I)
 
 def render_pdf(data: bytes):
