@@ -109,7 +109,8 @@ def render_pdf(data: bytes):
             "page": i + 1,
             "image": f"/uploads/{out.name}",
             "text": text,
-            "vector_paths": vector_paths
+            "vector_paths": vector_paths,
+            "vector_preview": f"/uploads/{preview_name}"
         })
 
     return pages
