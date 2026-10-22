@@ -57,6 +57,29 @@ def detect_colours(img: np.ndarray):
         result[name] = components
     return result
 
+def create_route_overlay(img: np.ndarray, output_path: Path):
+    """Highlight detected red special stages and blue road sections."""
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+
+    red_mask = (
+        cv2.inRange(hsv, np.array([0, 100, 80]), np.array([12, 255, 255]))
+        | cv2.inRange(hsv, np.array([168, 100, 80]), np.array([179, 255, 255]))
+    )
+    blue_mask = cv2.inRange(
+        hsv, np.array([90, 70, 60]), np.array([135, 255, 255])
+    )
+
+    kernel = np.ones((3, 3), np.uint8)
+    red_mask = cv2.morphologyEx(red_mask, cv2.MORPH_CLOSE, kernel)
+    blue_mask = cv2.morphologyEx(blue_mask, cv2.MORPH_CLOSE, kernel)
+
+    overlay = img.copy()
+    overlay[red_mask > 0] = (0, 0, 255)
+    overlay[blue_mask > 0] = (255, 80, 0)
+
+    cv2.imwrite(str(output_path), overlay)
+    return output_path
+
 def extract_stages(text: str):
     stages = []
     lines = [
