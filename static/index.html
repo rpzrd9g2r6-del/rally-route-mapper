@@ -1,0 +1,60 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rally Route Mapper</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f4f5f7;color:#17202a}
+header{background:#111827;color:white;padding:18px 20px;font-size:20px;font-weight:700}
+main{max-width:1100px;margin:auto;padding:18px}
+.card{background:white;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 10px #0001}
+button{background:#111827;color:white;border:0;border-radius:9px;padding:10px 14px;font-weight:600}
+button:disabled{opacity:.5}
+#status{margin-top:10px;color:#4b5563}
+.page{border:1px solid #ddd;border-radius:10px;padding:10px;margin-top:12px}
+.page img{width:100%;max-height:600px;object-fit:contain;background:#eee}
+.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#eef2ff;margin:3px;font-size:13px}
+</style>
+</head>
+<body>
+<header>Rally Route Mapper</header>
+<main>
+<div class="card">
+<h2>1. Upload route map</h2>
+<p>Upload a rally route-map PDF or image. The prototype detects red Special Stage and blue Road Section lines and extracts stage labels.</p>
+<input id="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp">
+<button id="go">Analyse map</button>
+<div id="status"></div>
+</div>
+<div class="card" id="results" style="display:none">
+<h2>Detected route information</h2>
+<div id="summary"></div>
+<div id="pages"></div>
+</div>
+</main>
+<script>
+const go=document.getElementById('go'), file=document.getElementById('file'), status=document.getElementById('status');
+go.onclick=async()=>{
+ if(!file.files[0]) return;
+ go.disabled=true; status.textContent='Uploading and analysing…';
+ const fd=new FormData(); fd.append('file',file.files[0]);
+ try{
+  const r=await fetch('/api/upload',{method:'POST',body:fd});
+  const d=await r.json(); if(!r.ok) throw new Error(d.detail||'Upload failed');
+  document.getElementById('results').style.display='block';
+  let stages=0, components=0;
+  d.pages.forEach(p=>{stages+=p.stages.length; components+=(p.routes.special_stage||[]).length+(p.routes.road_section||[]).length});
+  document.getElementById('summary').innerHTML=`<b>${d.filename}</b><br>${d.pages.length} page(s), ${stages} stage label group(s), ${components} detected route components.`;
+  document.getElementById('pages').innerHTML=d.pages.map(p=>`
+   <div class="page"><b>Page ${p.page}</b>
+   <div>${p.stages.map(s=>`<span class="badge">${s.stages.join(' & ')} — ${s.name}</span>`).join('')}</div>
+   <img src="${p.image}">
+   </div>`).join('');
+  status.textContent='Analysis complete.';
+ }catch(e){status.textContent=e.message}
+ go.disabled=false;
+};
+</script>
+</body>
+</html>
