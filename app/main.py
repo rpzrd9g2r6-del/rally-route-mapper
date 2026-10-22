@@ -77,9 +77,13 @@ def render_pdf(data: bytes):
                 })
 
         # Create a preview showing the extracted vector paths.
-        preview = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        preview = preview.copy()
         scale = 2
+        preview = np.full(
+            (int(page.rect.height * scale), int(page.rect.width * scale), 3),
+            255,
+            dtype=np.uint8
+        )
+        
 
         for path in vector_paths:
             color = (0, 0, 255) if path["type"] == "special_stage" else (255, 0, 0)
